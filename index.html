@@ -29,7 +29,13 @@
         <div class="controls">
             <button id="clearGarden">🌸 New Garden</button>
             <button id="toggleMusic">🎵 Ambient Sounds</button>
+            <button id="toggleTimeOfDay">🌙 Night Mode</button>
         </div>
+        
+        <!-- Hidden audio elements for ambient sounds -->
+        <audio id="ambientAudio" loop preload="auto">
+            <!-- We'll use Web Audio API instead of files for cross-platform compatibility -->
+        </audio>
         
         <div class="info-panel">
             <p>Your garden grows with each emotion you plant. Different emotions create unique plants that sway and flourish in their own beautiful way.</p>

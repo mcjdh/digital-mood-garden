@@ -4,8 +4,17 @@ class MoodGarden {
         this.ctx = this.canvas.getContext('2d');
         this.plants = [];
         this.particles = [];
+        this.fireflies = [];
         this.selectedEmotion = 'joy';
         this.animationId = null;
+        this.isNightMode = false;
+        this.audioContext = null;
+        this.ambientSounds = {
+            wind: null,
+            birds: null,
+            chimes: null
+        };
+        this.isAudioEnabled = false;
         
         this.emotions = {
             joy: { color: '#FFD700', secondary: '#FFA500', growth: 1.2, sway: 0.8 },
@@ -63,6 +72,11 @@ class MoodGarden {
             this.toggleAmbientSounds();
         });
         
+        // Day/Night toggle
+        document.getElementById('toggleTimeOfDay').addEventListener('click', () => {
+            this.toggleTimeOfDay();
+        });
+        
         // Window resize
         window.addEventListener('resize', () => {
             this.setupCanvas();
@@ -113,6 +127,9 @@ class MoodGarden {
         
         // Create planting particles
         this.createPlantingParticles(x, y, emotion.color);
+        
+        // Play gentle chime sound
+        this.playChimeSound();
     }
     
     createPlantingParticles(x, y, color) {
@@ -134,6 +151,7 @@ class MoodGarden {
     createAmbientParticles() {
         setInterval(() => {
             if (this.particles.length < 50) {
+                const particleType = this.isNightMode ? 'stardust' : 'ambient';
                 this.particles.push({
                     x: Math.random() * this.canvas.width / window.devicePixelRatio,
                     y: -10,
@@ -141,12 +159,13 @@ class MoodGarden {
                     vy: 0.5 + Math.random() * 0.5,
                     life: 1,
                     decay: 0.005,
-                    size: 1 + Math.random() * 2,
-                    color: '#ffffff',
-                    type: 'ambient'
+                    size: particleType === 'stardust' ? 1 + Math.random() * 3 : 1 + Math.random() * 2,
+                    color: particleType === 'stardust' ? '#e6e6fa' : '#ffffff',
+                    type: particleType,
+                    twinkle: Math.random() * Math.PI * 2
                 });
             }
-        }, 2000);
+        }, this.isNightMode ? 1000 : 2000);
     }
     
     animate() {
@@ -278,7 +297,17 @@ class MoodGarden {
     drawParticles() {
         this.particles.forEach(particle => {
             this.ctx.save();
-            this.ctx.globalAlpha = particle.life;
+            
+            if (particle.type === 'stardust' && this.isNightMode) {
+                // Add twinkling effect for night particles
+                const twinkle = Math.sin(Date.now() * 0.005 + particle.twinkle) * 0.3 + 0.7;
+                this.ctx.globalAlpha = particle.life * twinkle;
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowColor = particle.color;
+            } else {
+                this.ctx.globalAlpha = particle.life;
+            }
+            
             this.ctx.fillStyle = particle.color;
             this.ctx.beginPath();
             this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
@@ -286,6 +315,137 @@ class MoodGarden {
             this.ctx.restore();
         });
     }
+    
+    toggleTimeOfDay() {
+        this.isNightMode = !this.isNightMode;
+        const button = document.getElementById('toggleTimeOfDay');
+        const body = document.body;
+        
+        if (this.isNightMode) {
+            body.classList.add('night-mode');
+            button.textContent = '☀️ Day Mode';
+            this.createFireflies();
+        } else {
+            body.classList.remove('night-mode');
+            button.textContent = '🌙 Night Mode';
+            this.removeFireflies();
+        }
+    }
+    
+    createFireflies() {
+        const container = document.querySelector('.garden-container');
+        for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+                const firefly = document.createElement('div');
+                firefly.className = 'firefly';
+                firefly.style.left = Math.random() * 80 + 10 + '%';
+                firefly.style.top = Math.random() * 60 + 20 + '%';
+                firefly.style.animationDelay = Math.random() * 8 + 's';
+                firefly.style.animationDuration = (6 + Math.random() * 4) + 's';
+                container.appendChild(firefly);
+            }, i * 500);
+        }
+    }
+    
+    removeFireflies() {
+        const fireflies = document.querySelectorAll('.firefly');
+        fireflies.forEach(firefly => {
+            firefly.style.animation = 'fadeOut 1s ease-out forwards';
+            setTimeout(() => firefly.remove(), 1000);
+        });
+    }
+    
+    // Enhanced ambient sounds system
+    async initAudioContext() {
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        if (this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
+    }
+    
+    createWindSound() {
+        if (!this.audioContext) return;
+        
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        const filter = this.audioContext.createBiquadFilter();
+        
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(60, this.audioContext.currentTime);
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(200, this.audioContext.currentTime);
+        
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.02, this.audioContext.currentTime + 2);
+        
+        oscillator.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        oscillator.start();
+        
+        // Add subtle frequency modulation for wind effect
+        const lfo = this.audioContext.createOscillator();
+        const lfoGain = this.audioContext.createGain();
+        lfo.frequency.setValueAtTime(0.1, this.audioContext.currentTime);
+        lfoGain.gain.setValueAtTime(20, this.audioContext.currentTime);
+        
+        lfo.connect(lfoGain);
+        lfoGain.connect(oscillator.frequency);
+        lfo.start();
+        
+        return { oscillator, lfo, gainNode };
+    }
+    
+    playChimeSound() {
+        if (!this.audioContext || !this.isAudioEnabled) return;
+        
+        const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
+        const randomFreq = frequencies[Math.floor(Math.random() * frequencies.length)];
+        
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(randomFreq, this.audioContext.currentTime);
+        
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + 0.1);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 2);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        oscillator.start();
+        oscillator.stop(this.audioContext.currentTime + 2);
+    }
+    
+    async toggleAmbientSounds() {
+        const button = document.getElementById('toggleMusic');
+        
+        if (!this.isAudioEnabled) {
+            try {
+                await this.initAudioContext();
+                this.ambientSounds.wind = this.createWindSound();
+                this.isAudioEnabled = true;
+                button.textContent = '🔇 Ambient Sounds';
+            } catch (error) {
+                console.log('Audio not available:', error);
+            }
+        } else {
+            if (this.ambientSounds.wind) {
+                this.ambientSounds.wind.gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 1);
+                setTimeout(() => {
+                    this.ambientSounds.wind.oscillator.stop();
+                    this.ambientSounds.wind.lfo.stop();
+                }, 1000);
+            }
+            this.isAudioEnabled = false;
+            button.textContent = '🎵 Ambient Sounds';
+        }    }
     
     clearGarden() {
         this.plants = [];
@@ -296,23 +456,58 @@ class MoodGarden {
     saveGarden() {
         localStorage.setItem('moodGarden', JSON.stringify(this.plants));
     }
-    
-    loadGarden() {
+      loadGarden() {
         const saved = localStorage.getItem('moodGarden');
         if (saved) {
             this.plants = JSON.parse(saved);
         }
     }
     
-    toggleAmbientSounds() {
-        // Placeholder for ambient sounds functionality
+    playChimeSound() {
+        if (!this.audioContext || !this.isAudioEnabled) return;
+        
+        const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
+        const randomFreq = frequencies[Math.floor(Math.random() * frequencies.length)];
+        
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(randomFreq, this.audioContext.currentTime);
+        
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + 0.1);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 2);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        oscillator.start();
+        oscillator.stop(this.audioContext.currentTime + 2);
+    }
+    
+    async toggleAmbientSounds() {
         const button = document.getElementById('toggleMusic');
-        if (button.textContent.includes('🎵')) {
-            button.textContent = '🔇 Ambient Sounds';
-            // Add ambient sound logic here
+        
+        if (!this.isAudioEnabled) {
+            try {
+                await this.initAudioContext();
+                this.ambientSounds.wind = this.createWindSound();
+                this.isAudioEnabled = true;
+                button.textContent = '🔇 Ambient Sounds';
+            } catch (error) {
+                console.log('Audio not available:', error);
+            }
         } else {
+            if (this.ambientSounds.wind) {
+                this.ambientSounds.wind.gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 1);
+                setTimeout(() => {
+                    this.ambientSounds.wind.oscillator.stop();
+                    this.ambientSounds.wind.lfo.stop();
+                }, 1000);
+            }
+            this.isAudioEnabled = false;
             button.textContent = '🎵 Ambient Sounds';
-            // Stop ambient sounds here
         }
     }
 }
@@ -353,13 +548,69 @@ document.addEventListener('DOMContentLoaded', () => {
         @keyframes sparkleFloat {
             0% {
                 opacity: 1;
-                transform: scale(1) translateY(0);
+                transform: scale(1) translateY(0) rotate(0deg);
             }
             100% {
                 opacity: 0;
-                transform: scale(0) translateY(-20px);
+                transform: scale(0) translateY(-20px) rotate(180deg);
             }
+        }
+        
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .firefly {
+            transition: opacity 1s ease-out;
         }
     `;
     document.head.appendChild(style);
+    
+    // Add gentle welcome message
+    setTimeout(() => {
+        const message = document.createElement('div');
+        message.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            padding: 15px 20px;
+            border-radius: 15px;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            animation: slideInRight 1s ease-out forwards;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+        `;
+        message.innerHTML = `
+            <strong>🌸 Welcome to your Mood Garden!</strong><br>
+            <small>Try night mode and ambient sounds for extra magic ✨</small>
+        `;
+        
+        const slideInStyle = document.createElement('style');
+        slideInStyle.textContent = `
+            @keyframes slideInRight {
+                from {
+                    opacity: 0;
+                    transform: translateX(100px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+        `;
+        document.head.appendChild(slideInStyle);
+        
+        document.body.appendChild(message);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            message.style.animation = 'slideInRight 1s ease-out reverse forwards';
+            setTimeout(() => message.remove(), 1000);
+        }, 5000);
+    }, 2000);
 });
