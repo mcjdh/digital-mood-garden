@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Mood Garden</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="garden-header">
+            <h1>Digital Mood Garden</h1>
+            <p class="subtitle">Click anywhere to plant your emotions and watch them bloom</p>
+        </header>
+        
+        <div class="garden-container">
+            <canvas id="gardenCanvas"></canvas>
+            <div class="emotion-palette">
+                <div class="emotion-btn" data-emotion="joy" style="--color: #FFD700">✨ Joy</div>
+                <div class="emotion-btn" data-emotion="calm" style="--color: #87CEEB">🌊 Calm</div>
+                <div class="emotion-btn" data-emotion="love" style="--color: #FF69B4">💖 Love</div>
+                <div class="emotion-btn" data-emotion="hope" style="--color: #98FB98">🌱 Hope</div>
+                <div class="emotion-btn" data-emotion="wonder" style="--color: #DDA0DD">✨ Wonder</div>
+                <div class="emotion-btn" data-emotion="peace" style="--color: #F0E68C">☮️ Peace</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="clearGarden">🌸 New Garden</button>
+            <button id="toggleMusic">🎵 Ambient Sounds</button>
+        </div>
+        
+        <div class="info-panel">
+            <p>Your garden grows with each emotion you plant. Different emotions create unique plants that sway and flourish in their own beautiful way.</p>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
